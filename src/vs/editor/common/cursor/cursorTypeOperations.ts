@@ -200,18 +200,32 @@ export class TypeOperations {
 		return indentation;
 	}
 
-	private static _replaceJumpToNextIndent(config: CursorConfiguration, model: ICursorSimpleModel, selection: Selection, insertsAutoWhitespace: boolean): ReplaceCommand {
+	private static _replaceJumpToNextIndent(config: CursorConfiguration, model: ICursorSimpleModel, selection: Selection, insertsAutoWhitespace: boolean): ICommand {
 		let typeText = '';
 
-		const position = selection.getStartPosition();
 		if (config.insertSpaces) {
-			const visibleColumnFromColumn = config.visibleColumnFromColumn(model, position);
+			const visibleColumnFromColumn = config.visibleColumnFromColumn(model, selection.getStartPosition());
 			const indentSize = config.indentSize;
 			const spacesCnt = indentSize - (visibleColumnFromColumn % indentSize);
 			for (let i = 0; i < spacesCnt; i++) {
 				typeText += ' ';
 			}
 		} else {
+			if (config.tabSize > config.indentSize) {
+				// If configured for mixed indentation and selection is at the front, do a shift instead,
+				// which will properly normalize existing leading whitespace
+				const firstNonWhitespace = model.getLineFirstNonWhitespaceColumn(selection.endLineNumber);
+				if (selection.endColumn <= firstNonWhitespace) {
+					return new ShiftCommand(selection, {
+						isUnshift: false,
+						tabSize: config.tabSize,
+						indentSize: config.indentSize,
+						insertSpaces: config.insertSpaces,
+						useTabStops: config.useTabStops,
+						autoIndent: config.autoIndent
+					}, config.languageConfigurationService);
+				}
+			}
 			typeText = '\t';
 		}
 
